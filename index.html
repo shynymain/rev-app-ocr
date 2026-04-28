@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rev OCR 自動入力100%版</title>
+<style>
+:root{--bg:#eef3f8;--card:#fff;--ink:#0f172a;--muted:#64748b;--blue:#2563eb;--gray:#64748b;--red:#b91c1c;--line:#cbd5e1}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}
+header{background:#111827;color:white;padding:20px 24px;font-weight:800;font-size:24px}.wrap{max-width:1080px;margin:auto;padding:16px}.card{background:var(--card);border-radius:22px;padding:18px;margin:14px 0;box-shadow:0 8px 24px rgba(15,23,42,.08)}
+h2{font-size:26px;margin:0 0 14px}.desc{color:var(--muted);line-height:1.6}input,select,textarea,button{font:inherit;border:1px solid var(--line);border-radius:14px;padding:12px;width:100%;background:white}textarea{min-height:150px}button{border:0;background:var(--blue);color:white;font-weight:800}button.secondary{background:var(--gray)}button.danger{background:var(--red)}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.status{white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:12px;overflow:auto;max-height:280px}.err{color:var(--red);font-weight:800}.ok{color:#047857;font-weight:800}table{width:100%;border-collapse:separate;border-spacing:0 8px;min-width:900px}th{background:#111827;color:white;padding:10px;text-align:left}td{background:#f8fafc;padding:6px;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0}.scroll{overflow:auto}td input{padding:8px;border-radius:10px}.pill{display:inline-block;background:#e0f2fe;color:#075985;padding:4px 8px;border-radius:999px;font-size:12px;margin-left:6px}.small{font-size:13px;color:var(--muted)}
+@media(max-width:720px){.grid{grid-template-columns:1fr 1fr}.row,.grid2{grid-template-columns:1fr}header{font-size:22px}.wrap{padding:10px}.card{padding:14px}button{min-height:54px}}
+</style>
+</head>
+<body>
+<header>Rev OCR 自動入力100%版</header>
+<div class="wrap">
+  <section class="card">
+    <h2>OCR読み取り</h2>
+    <p class="desc">出馬表・オッズ・結果・レース情報をOCRで読み取り、下の入力欄へ自動反映します。読み取り後も手修正できます。</p>
+    <input type="file" id="file" accept="image/*" />
+    <div class="row" style="margin-top:10px">
+      <select id="mode">
+        <option value="auto">auto：自動判定</option>
+        <option value="race">レース情報</option>
+        <option value="entries">出馬表</option>
+        <option value="odds">単勝オッズ</option>
+        <option value="result">結果・払戻</option>
+      </select>
+      <button onclick="runOCR()">OCR実行→自動反映</button>
+    </div>
+    <div class="grid2" style="margin-top:10px">
+      <button class="secondary" onclick="checkApi()">API確認</button>
+      <button class="secondary" onclick="applyPasted()">貼付JSON/テキストを反映</button>
+    </div>
+    <textarea id="paste" placeholder="OCR結果やChatGPT読み取り結果を貼り付けても反映できます" style="margin-top:10px"></textarea>
+    <div id="msg" style="margin-top:10px"></div>
+    <pre id="raw" class="status"></pre>
+  </section>
+
+  <section class="card">
+    <h2>レース情報</h2>
+    <div class="grid">
+      <input id="date" placeholder="年月日 例:2026/4/28" />
+      <input id="venue" placeholder="開催地 例:東京" />
+      <input id="raceName" placeholder="レース名" />
+      <select id="grade"><option value="">グレード</option><option>G1</option><option>G2</option><option>G3</option><option>OP</option><option>オープン特別</option><option>3勝</option><option>2勝</option><option>1勝</option><option>未勝利</option><option>新馬</option></select>
+      <select id="surface"><option value="">馬場</option><option>芝</option><option>ダート</option><option>障害</option></select>
+      <input id="distance" placeholder="距離 例:1600" />
+      <select id="condition"><option value="">条件</option><option>定量</option><option>別定</option><option>ハンデ</option></select>
+      <input id="heads" placeholder="頭数" />
+      <select id="age"><option value="">年齢</option><option>2歳</option><option>3歳</option><option>3歳以上</option><option>4歳以上</option></select>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>出馬表 <span class="pill" id="horseCount">0頭</span></h2>
+    <div class="grid2" style="margin-bottom:8px">
+      <button class="secondary" onclick="addHorseRows(1)">1行追加</button>
+      <button class="danger" onclick="clearHorses()">出馬表クリア</button>
+    </div>
+    <div class="scroll"><table><thead><tr><th>枠</th><th>馬番</th><th>馬名</th><th>前走</th><th>前2走</th><th>前3走</th><th>単勝</th><th>人気</th><th>印</th></tr></thead><tbody id="horses"></tbody></table></div>
+  </section>
+
+  <section class="card">
+    <h2>結果入力</h2>
+    <div class="grid">
+      <input id="r1" placeholder="1着 馬番" />
+      <input id="r2" placeholder="2着 馬番" />
+      <input id="r3" placeholder="3着 馬番" />
+      <input id="umaren" placeholder="馬連 例:1-7" />
+      <input id="umarenPay" placeholder="馬連払戻" />
+      <input id="sanren" placeholder="3連複 例:1-7-8" />
+      <input id="sanrenPay" placeholder="3連複払戻" />
+    </div>
+  </section>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+function setMsg(t, cls=''){ $('msg').innerHTML = `<div class="${cls}">${escapeHtml(t)}</div>`; }
+function escapeHtml(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function showRaw(x){ $('raw').textContent = typeof x === 'string' ? x : JSON.stringify(x,null,2); }
+
+async function checkApi(){
+  try{ const r=await fetch('/api/health?ts='+Date.now()); const t=await r.text(); showRaw(t); setMsg('API確認完了','ok'); }
+  catch(e){ setMsg('API確認エラー: '+e.message,'err'); }
+}
+
+async function runOCR(){
+  const file=$('file').files[0]; if(!file){alert('画像を選択してください');return;}
+  const fd=new FormData(); fd.append('file',file); fd.append('mode',$('mode').value);
+  setMsg('OCR実行中...'); showRaw('読み込み中...');
+  const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),35000);
+  try{
+    const res=await fetch('/api/ocr?ts='+Date.now(),{method:'POST',body:fd,signal:controller.signal});
+    clearTimeout(timer);
+    const text=await res.text();
+    let json; try{json=JSON.parse(text);}catch{showRaw(text); setMsg('JSONではない応答','err'); return;}
+    showRaw(json);
+    if(!json.ok){ setMsg('OCRエラー','err'); return; }
+    applyData(json.data || json);
+    setMsg('OCR反映完了','ok');
+  }catch(e){ clearTimeout(timer); setMsg('OCRタイムアウト/通信エラー: '+e.message,'err'); showRaw(String(e)); }
+}
+
+function applyPasted(){
+  const text=$('paste').value.trim(); if(!text) return alert('貼り付け欄が空です');
+  const data=parseAny(text); showRaw(data); applyData(data); setMsg('貼付内容を反映しました','ok');
+}
+
+function parseAny(text){
+  let t=text.replace(/```json/gi,'').replace(/```/g,'').trim();
+  const s=t.indexOf('{'), e=t.lastIndexOf('}');
+  if(s>=0 && e>=s){ try{return JSON.parse(t.slice(s,e+1));}catch{} }
+  const horses=[];
+  t.split(/\n+/).forEach(line=>{
+    const m=line.match(/(?:([1-8])枠)?\s*([0-9]{1,2})番?\s+([^\d\s]+)\s+([0-9取消中止除外]+)?(?:→|\s+)?([0-9取消中止除外]+)?(?:→|\s+)?([0-9取消中止除外]+)?/);
+    if(m) horses.push({frame:m[1]||'', number:m[2]||'', name:m[3]||'', last1:normRank(m[4]), last2:normRank(m[5]), last3:normRank(m[6])});
+    const o=line.match(/^\s*([0-9]{1,2})\s+(.+?)\s+([0-9]+(?:\.[0-9]+)?)\s*$/);
+    if(o){ const h=horses.find(x=>x.number===o[1]) || {number:o[1],name:o[2]}; h.odds=o[3]; if(!horses.includes(h)) horses.push(h); }
+  });
+  return {text:t, horses};
+}
+function normRank(v){ if(!v) return ''; return /取消|中止|除外/.test(v)?'0':String(v).replace(/[^0-9]/g,''); }
+
+function applyData(d){
+  if(d.data) d=d.data;
+  const ri=d.raceInfo||{};
+  setVal('date', ri.date); setVal('venue', ri.venue); setVal('raceName', ri.raceName); setVal('grade', ri.grade); setVal('surface', ri.surface); setVal('distance', cleanNum(ri.distance)); setVal('condition', ri.condition); setVal('age', ri.age);
+  if(ri.heads) setVal('heads', cleanNum(ri.heads));
+  if(d.text) inferRaceInfo(d.text);
+  if(Array.isArray(d.horses) && d.horses.length){ mergeHorses(d.horses); }
+  if(d.result) applyResult(d.result);
+  recomputePopularity(); applyMarks();
+}
+function setVal(id,v){ if(v!==undefined && v!==null && String(v).trim()!=='') $(id).value=String(v).trim(); }
+function cleanNum(v){return String(v||'').replace(/[^0-9]/g,'');}
+function inferRaceInfo(text){
+  if(!$('venue').value){ ['東京','中山','阪神','京都','中京','札幌','函館','福島','新潟','小倉'].some(x=> text.includes(x) && ($('venue').value=x)); }
+  if(!$('surface').value){ if(text.includes('ダート')) $('surface').value='ダート'; else if(text.includes('芝')) $('surface').value='芝'; }
+  const dist=text.match(/(芝|ダート)?\s*([0-9]{3,4})m?/); if(dist&&!$('distance').value) $('distance').value=dist[2];
+  const heads=text.match(/([0-9]{1,2})頭/); if(heads) $('heads').value=heads[1];
+  ['G1','G2','G3','1勝','2勝','3勝','未勝利','新馬'].some(x=> text.includes(x) && !$('grade').value && ($('grade').value=x));
+}
+function mergeHorses(list){
+  const map=new Map(currentHorses().map(h=>[h.number,h]));
+  list.forEach(h=>{ const n=String(h.number||'').replace(/[^0-9]/g,''); if(!n && !h.name) return; map.set(n || h.name, {...(map.get(n)||{}), ...h, number:n||h.number||''}); });
+  renderHorses([...map.values()].sort((a,b)=>(+a.number||999)-(+b.number||999)));
+}
+function currentHorses(){ return [...document.querySelectorAll('#horses tr')].map(tr=>({frame:tr.querySelector('.frame').value,number:tr.querySelector('.number').value,name:tr.querySelector('.name').value,last1:tr.querySelector('.last1').value,last2:tr.querySelector('.last2').value,last3:tr.querySelector('.last3').value,odds:tr.querySelector('.odds').value,popularity:tr.querySelector('.popularity').value,mark:tr.querySelector('.mark').value})); }
+function renderHorses(list){ $('horses').innerHTML=''; list.forEach(addHorseRow); $('heads').value=list.length || $('heads').value; $('horseCount').textContent=(list.length||0)+'頭'; }
+function addHorseRows(n){ for(let i=0;i<n;i++) addHorseRow({}); $('horseCount').textContent=document.querySelectorAll('#horses tr').length+'頭'; }
+function addHorseRow(h){
+  const tr=document.createElement('tr'); tr.innerHTML=['frame','number','name','last1','last2','last3','odds','popularity','mark'].map(k=>`<td><input class="${k}" value="${escapeHtml(h[k]||'')}"></td>`).join(''); $('horses').appendChild(tr);
+}
+function clearHorses(){ $('horses').innerHTML=''; $('horseCount').textContent='0頭'; }
+function recomputePopularity(){
+  const rows=currentHorses().map((h,i)=>({i,odds:parseFloat(h.odds)})).filter(x=>!isNaN(x.odds)).sort((a,b)=>a.odds-b.odds);
+  let rank=1, prev=null; const pop={}; rows.forEach((r,idx)=>{ if(prev!==null && r.odds!==prev) rank=idx+1; pop[r.i]=rank; prev=r.odds; });
+  document.querySelectorAll('#horses tr').forEach((tr,i)=>{ if(pop[i]) tr.querySelector('.popularity').value=pop[i]; });
+}
+function applyMarks(){
+  document.querySelectorAll('#horses tr').forEach(tr=>{
+    const nums=[tr.querySelector('.last1').value,tr.querySelector('.last2').value,tr.querySelector('.last3').value].map(x=>String(x).replace(/[^0-9]/g,''));
+    let mark='';
+    if(nums.includes('0')) mark='';
+    else {
+      const s=nums.join(''); const sum=nums.reduce((a,b)=>a+(+b||0),0)%10;
+      if(/^(111|555)$/.test(s) || ['149','146','185','914','814','614','641','941'].includes(s)) mark='▲';
+      if(sum===5) mark='○'; if(sum===9) mark='▲'; if(s==='555') mark='▲';
+    }
+    tr.querySelector('.mark').value=mark;
+  });
+}
+function applyResult(r){
+  if(r.first) setVal('r1', r.first.number || r.first); if(r.second) setVal('r2', r.second.number || r.second); if(r.third) setVal('r3', r.third.number || r.third);
+  const u=Array.isArray(r.umaren)?r.umaren[0]:r.umaren; if(u){ setVal('umaren', u.combination || u); setVal('umarenPay', u.payout); }
+  const s=Array.isArray(r.sanrenpuku)?r.sanrenpuku[0]:r.sanrenpuku; if(s){ setVal('sanren', s.combination || s); setVal('sanrenPay', s.payout); }
+}
+addHorseRows(8);
+</script>
+</body>
+</html>
