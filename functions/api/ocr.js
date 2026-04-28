@@ -11,10 +11,7 @@ export async function onRequestPost({ request, env }) {
     const file = formData.get("file");
 
     if (!file) {
-      return Response.json({
-        ok: false,
-        error: "画像ファイルがありません"
-      });
+      return Response.json({ ok: false, error: "画像ファイルがありません" });
     }
 
     const imageBytes = new Uint8Array(await file.arrayBuffer());
@@ -25,14 +22,7 @@ export async function onRequestPost({ request, env }) {
       max_tokens: 1800,
       prompt: `
 あなたは競馬画像専用OCRです。
-画像から「レース情報」「出馬表」「単勝オッズ」「結果」を読み取ってください。
-
-必ずJSONだけで返してください。
-説明文は禁止。
-Markdownは禁止。
-コードブロックは禁止。
-
-出力形式は必ずこれです。
+必ずJSONだけで返してください。説明文は禁止。
 
 {
   "raceInfo": {
@@ -62,6 +52,61 @@ Markdownは禁止。
     "first": "",
     "second": "",
     "third": "",
+    "umaren": "",
+    "umarenPay": "",
+    "sanrenpuku": "",
+    "sanrenpukuPay": ""
+  },
+  "text": ""
+}
+
+読めない項目は空文字。
+馬番・枠・着順は数字だけ。
+取消/中止/除外は0。
+`
+    });
+
+    let text = "";
+
+    if (typeof aiResult === "string") {
+      text = aiResult;
+    } else if (aiResult.response) {
+      text = aiResult.response;
+    } else if (aiResult.result) {
+      text = aiResult.result;
+    } else if (aiResult.text) {
+      text = aiResult.text;
+    } else {
+      text = JSON.stringify(aiResult);
+    }
+
+    text = String(text)
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+
+    if (start === -1 || end === -1) {
+      return Response.json({ ok: false, error: "JSONを抽出できません", raw: text });
+    }
+
+    const parsed = JSON.parse(text.slice(start, end + 1));
+
+    return Response.json({ ok: true, data: parsed });
+
+  } catch (e) {
+    return Response.json({ ok: false, error: String(e.message || e) });
+  }
+}
+
+export async function onRequestGet() {
+  return Response.json({
+    ok: true,
+    message: "OCR API is running. Use POST with image file."
+  });
+}    "third": "",
     "umaren": "",
     "umarenPay": "",
     "sanrenpuku": "",
