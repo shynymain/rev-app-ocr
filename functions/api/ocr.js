@@ -62,6 +62,34 @@ export async function onRequestPost({ request, env }) {
 
     let text = "";
 
+    if (typeof  },
+  "horses": [
+    {
+      "frame": "",
+      "number": "",
+      "name": "",
+      "last1": "",
+      "last2": "",
+      "last3": "",
+      "odds": "",
+      "popularity": ""
+    }
+  ],
+  "result": {
+    "first": "",
+    "second": "",
+    "third": "",
+    "umaren": "",
+    "umarenPay": "",
+    "sanrenpuku": "",
+    "sanrenpukuPay": ""
+  }
+}
+`
+    });
+
+    let text = "";
+
     if (typeof aiResult === "string") {
       text = aiResult;
     } else if (aiResult.response) {
