@@ -3,7 +3,7 @@ export async function onRequestPost({ request, env }) {
     if (!env.AI) {
       return Response.json({
         ok: false,
-        error: "Workers AI binding がありません。Cloudflareで変数名 AI の binding を追加してください。"
+        error: "Workers AI binding がありません"
       });
     }
 
@@ -21,8 +21,7 @@ export async function onRequestPost({ request, env }) {
       temperature: 0,
       max_tokens: 1800,
       prompt: `
-あなたは競馬画像専用OCRです。
-必ずJSONだけで返してください。説明文は禁止。
+競馬画像をOCRしてJSONで返せ。
 
 {
   "raceInfo": {
@@ -35,6 +34,66 @@ export async function onRequestPost({ request, env }) {
     "heads": "",
     "condition": "",
     "age": ""
+  },
+  "horses": [
+    {
+      "frame": "",
+      "number": "",
+      "name": "",
+      "last1": "",
+      "last2": "",
+      "last3": "",
+      "odds": "",
+      "popularity": ""
+    }
+  ],
+  "result": {
+    "first": "",
+    "second": "",
+    "third": "",
+    "umaren": "",
+    "umarenPay": "",
+    "sanrenpuku": "",
+    "sanrenpukuPay": ""
+  }
+}
+`
+    });
+
+    let text = "";
+
+    if (typeof aiResult === "string") {
+      text = aiResult;
+    } else if (aiResult.response) {
+      text = aiResult.response;
+    } else {
+      text = JSON.stringify(aiResult);
+    }
+
+    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+
+    if (start === -1 || end === -1) {
+      return Response.json({ ok: false, error: "JSON抽出失敗", raw: text });
+    }
+
+    const parsed = JSON.parse(text.slice(start, end + 1));
+
+    return Response.json({ ok: true, data: parsed });
+
+  } catch (e) {
+    return Response.json({ ok: false, error: String(e.message || e) });
+  }
+}
+
+export async function onRequestGet() {
+  return Response.json({
+    ok: true,
+    message: "OCR API is running"
+  });
+}    "age": ""
   },
   "horses": [
     {
